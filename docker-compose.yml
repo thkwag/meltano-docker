@@ -1,0 +1,39 @@
+version: '3.8'
+
+x-meltano-image: &meltano-common
+  image: ${MELTANO_IMAGE_NAME:-thkwag/meltano}
+  build: 
+    context: ./
+    dockerfile: ./docker/Dockerfile
+  environment:
+    MELTANO_PYTHON_VERSION: ${MELTANO_PYTHON_VERSION:-3.9}
+    MELTANO_VERSION: ${MELTANO_VERSION:-2.19.1}
+    MELTANO_CLI_LOG_LEVEL: ${MELTANO_CLI_LOG_LEVEL:-info}
+    # MELTANO_DATABASE_URI: postgresql://postgres:postgres@meltano-system-db/meltano
+  volumes:
+    - ./project:/meltano/project
+
+services:
+  meltano:
+    <<: *meltano-common
+    container_name: ${MELTANO_CONTAINER_NAME:-meltano}
+    restart: unless-stopped
+    depends_on:
+      meltano-init:
+        condition: service_completed_successfully
+
+  meltano-init:
+    <<: *meltano-common
+    container_name: ${MELTANO_CONTAINER_NAME:-meltano}-init
+    entrypoint: /bin/bash
+    # yamllint disable rule:line-length
+    command:
+      - -c
+      - |
+        if [[ ! -e /meltano/project/meltano.yml ]]; then
+          echo
+          echo -e "\033[1;33mWARNING!!!: Meltano project not initialized!\e[0m"
+          echo
+          meltano init /meltano/project --force
+        fi
+    # yamllint enable rule:line-length
